@@ -26,11 +26,63 @@
     display:flex; align-items:center; justify-content:space-between;
     border-bottom:1px solid var(--line);
   }
-  header h1{font-size:18px; margin:0; letter-spacing:.3px;}
+  header h1{font-size:18px; margin:0; letter-spacing:.3px; flex:1;}
   #timerHandle{
     background:var(--card2); border:1px solid var(--line); color:var(--text);
     border-radius:10px; padding:7px 12px; font-size:16px; cursor:pointer;
   }
+  #menuBtn{
+    background:var(--card2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:7px 12px; font-size:16px; cursor:pointer; margin-right:10px;
+  }
+
+  /* ---- left menu drawer ---- */
+  #menuDrawer{
+    position:fixed; top:0; left:0; bottom:0; width:min(250px,75vw); z-index:40;
+    background:var(--card); border-right:1px solid var(--line);
+    transform:translateX(-105%); transition:transform .28s ease;
+    padding:calc(20px + env(safe-area-inset-top)) 14px 20px;
+    box-shadow:8px 0 30px rgba(0,0,0,.45);
+  }
+  #menuDrawer.open{transform:translateX(0);}
+  #menuDrawer h2{margin:0 0 14px; font-size:16px; color:var(--dim); font-weight:600;}
+  .menu-item{
+    padding:14px 12px; border-radius:12px; font-size:15px; font-weight:600;
+    cursor:pointer; user-select:none; -webkit-user-select:none;
+  }
+  .menu-item:active{background:var(--card2);}
+  #menuScrim{
+    position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:30;
+    opacity:0; pointer-events:none; transition:opacity .28s;
+  }
+  #menuScrim.open{opacity:1; pointer-events:auto;}
+
+  .setting-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:13px 4px; font-size:15px; border-bottom:1px solid var(--line);
+  }
+  .setting-row input[type=checkbox]{width:22px; height:22px; accent-color:var(--accent);}
+  .danger-btn{
+    width:100%; background:rgba(248,113,113,.12); border:1px solid var(--red); color:var(--red);
+    border-radius:12px; padding:13px; font-size:14px; font-weight:600; cursor:pointer; margin-top:14px;
+  }
+  .wide-btn{
+    width:100%; background:var(--card2); border:1px solid var(--line); color:var(--text);
+    border-radius:12px; padding:14px; font-size:15px; font-weight:600; cursor:pointer; margin-bottom:10px;
+  }
+
+  /* ---- accounts / music ---- */
+  #accountsPanel{padding:10px 14px 90px;}
+  .music-section{margin-bottom:14px;}
+  .music-section h3{margin:0 0 10px; font-size:15px;}
+  .music-note{font-size:12px; color:var(--dim); margin:6px 0 10px; line-height:1.5;}
+  #ytPlayerBox iframe, #ytPlayerBox{width:100%; border-radius:12px; border:0;}
+  .music-controls{display:flex; gap:8px; margin-top:10px;}
+  .music-controls button{
+    flex:1; background:var(--card2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:11px 0; font-size:14px; cursor:pointer;
+  }
+  .music-controls button.active{border-color:var(--accent); color:var(--accent);}
 
   /* ---- category tabs ---- */
   #tabs{
@@ -235,12 +287,48 @@
 <body>
 
 <header>
+  <button id="menuBtn" aria-label="Open menu">☰</button>
   <h1>💪 Workout Tracker</h1>
   <button id="timerHandle" aria-label="Toggle timer">⏱ Timer</button>
 </header>
 
+<!-- Left menu drawer -->
+<div id="menuScrim"></div>
+<div id="menuDrawer">
+  <h2>Menu</h2>
+  <div class="menu-item" id="miSettings">⚙️ Settings</div>
+  <div class="menu-item" id="miLogs">📄 Logs</div>
+</div>
+
+<!-- Settings modal -->
+<div class="modal-scrim" id="settingsScrim">
+  <div class="modal">
+    <h3>Settings</h3>
+    <label class="setting-row"><span>Timer sound</span><input type="checkbox" id="soundToggle"></label>
+    <button class="danger-btn" id="clearDataBtn">Clear all workout data</button>
+    <div class="modal-actions">
+      <button class="modal-cancel" id="settingsClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Logs modal -->
+<div class="modal-scrim" id="logsScrim">
+  <div class="modal">
+    <h3>Logs</h3>
+    <p class="music-note">Back up everything — workout history, presets, timers and settings — to a zip file you can keep, or restore from one.</p>
+    <button class="repeat-btn" id="exportBtn">⬇ Save backup (.zip)</button>
+    <button class="wide-btn" id="importBtn">⬆ Import backup…</button>
+    <input type="file" id="importFile" accept=".zip,.json" style="display:none">
+    <div class="modal-actions">
+      <button class="modal-cancel" id="logsClose">Close</button>
+    </div>
+  </div>
+</div>
+
 <div id="tabs"></div>
 <div id="sessions"></div>
+<div id="accountsPanel" style="display:none"></div>
 
 <!-- Timer slide-in panel -->
 <div id="timerScrim"></div>
@@ -264,6 +352,7 @@
     <button data-sec="60">1:00</button>
     <button data-sec="90">1:30</button>
     <button data-sec="120">2:00</button>
+    <button data-sec="150">2:30</button>
     <button data-sec="180">3:00</button>
     <button data-sec="300">5:00</button>
   </div>
@@ -384,10 +473,10 @@ function esc(s){
 function renderTabs(){
   const el = document.getElementById("tabs");
   el.innerHTML = "";
-  CATEGORIES.forEach(c=>{
+  [...CATEGORIES, "Accounts"].forEach(c=>{
     const b = document.createElement("div");
     b.className = "tab" + (c===activeCat?" active":"");
-    b.textContent = c;
+    b.textContent = c==="Accounts" ? "🎵 Accounts" : c;
     b.onclick = ()=>{ activeCat=c; save(); renderTabs(); renderSessions(); };
     el.appendChild(b);
   });
@@ -396,7 +485,16 @@ function renderTabs(){
 /* ================= render sessions ================= */
 function renderSessions(){
   const wrap = document.getElementById("sessions");
+  const acc = document.getElementById("accountsPanel");
   wrap.innerHTML = "";
+
+  // the Accounts panel is persistent (hidden, not destroyed) so music keeps playing on other tabs
+  if(activeCat==="Accounts"){
+    if(!acc.dataset.built) buildAccountsPanel();
+    acc.style.display = "";
+    return;
+  }
+  acc.style.display = "none";
 
   // the "empty row" with a + on the right
   const addRow = document.createElement("div");
@@ -844,6 +942,318 @@ function finishSession(withRatings){
 document.getElementById("rateSave").onclick = ()=>finishSession(true);
 document.getElementById("rateSkip").onclick = ()=>finishSession(false);
 
+/* ================= menu drawer ================= */
+const menuDrawer = document.getElementById("menuDrawer");
+const menuScrim = document.getElementById("menuScrim");
+function openMenu(){ menuDrawer.classList.add("open"); menuScrim.classList.add("open"); }
+function closeMenu(){ menuDrawer.classList.remove("open"); menuScrim.classList.remove("open"); }
+document.getElementById("menuBtn").onclick = ()=>{
+  menuDrawer.classList.contains("open") ? closeMenu() : openMenu();
+};
+menuScrim.onclick = closeMenu;
+
+/* ---- settings ---- */
+document.getElementById("miSettings").onclick = ()=>{
+  closeMenu();
+  document.getElementById("soundToggle").checked = data.soundOn!==false;
+  document.getElementById("settingsScrim").classList.add("open");
+};
+document.getElementById("settingsClose").onclick = ()=>document.getElementById("settingsScrim").classList.remove("open");
+document.getElementById("soundToggle").onchange = e=>{ data.soundOn = e.target.checked; save(); };
+document.getElementById("clearDataBtn").onclick = ()=>{
+  if(confirm("Delete ALL workout history, presets and timers? This cannot be undone.")){
+    localStorage.removeItem(STORE_KEY);
+    location.reload();
+  }
+};
+document.getElementById("settingsScrim").onclick = e=>{ if(e.target.id==="settingsScrim") e.target.classList.remove("open"); };
+
+/* ---- logs: zip backup & restore ---- */
+document.getElementById("miLogs").onclick = ()=>{
+  closeMenu();
+  document.getElementById("logsScrim").classList.add("open");
+};
+document.getElementById("logsClose").onclick = ()=>document.getElementById("logsScrim").classList.remove("open");
+document.getElementById("logsScrim").onclick = e=>{ if(e.target.id==="logsScrim") e.target.classList.remove("open"); };
+
+function crc32(u8){
+  let table = crc32.table;
+  if(!table){
+    table = crc32.table = new Int32Array(256);
+    for(let n=0;n<256;n++){
+      let c=n;
+      for(let k=0;k<8;k++) c = (c&1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1);
+      table[n]=c;
+    }
+  }
+  let crc=-1;
+  for(let i=0;i<u8.length;i++) crc = (crc>>>8) ^ table[(crc^u8[i])&0xFF];
+  return (crc^-1)>>>0;
+}
+
+/* single-file zip, "store" method — readable by any unzip tool */
+function buildZip(name, dataBytes){
+  const nameB = new TextEncoder().encode(name);
+  const crc = crc32(dataBytes), size = dataBytes.length;
+  const now = new Date();
+  const dosTime = (now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1);
+  const dosDate = ((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate();
+  const u16 = v=>[v&255,(v>>8)&255];
+  const u32 = v=>[v&255,(v>>8)&255,(v>>16)&255,(v>>>24)&255];
+  const local = [0x50,0x4b,3,4, ...u16(20), ...u16(0), ...u16(0), ...u16(dosTime), ...u16(dosDate),
+    ...u32(crc), ...u32(size), ...u32(size), ...u16(nameB.length), ...u16(0)];
+  const central = [0x50,0x4b,1,2, ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(dosTime), ...u16(dosDate),
+    ...u32(crc), ...u32(size), ...u32(size), ...u16(nameB.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+    ...u32(0), ...u32(0)];
+  const cdOff = local.length + nameB.length + size;
+  const cdSize = central.length + nameB.length;
+  const end = [0x50,0x4b,5,6, ...u16(0), ...u16(0), ...u16(1), ...u16(1), ...u32(cdSize), ...u32(cdOff), ...u16(0)];
+  const out = new Uint8Array(cdOff + cdSize + end.length);
+  let o=0;
+  out.set(local,o); o+=local.length;
+  out.set(nameB,o); o+=nameB.length;
+  out.set(dataBytes,o); o+=size;
+  out.set(central,o); o+=central.length;
+  out.set(nameB,o); o+=nameB.length;
+  out.set(end,o);
+  return out;
+}
+
+function parseZip(u8){
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  if(u8.length<30 || dv.getUint32(0,true)!==0x04034b50) return null;   // not a zip
+  if(dv.getUint16(8,true)!==0) return null;                            // compressed — not one of ours
+  const size = dv.getUint32(18,true);
+  const n = dv.getUint16(26,true), m = dv.getUint16(28,true);
+  return u8.slice(30+n+m, 30+n+m+size);
+}
+
+document.getElementById("exportBtn").onclick = ()=>{
+  const bytes = new TextEncoder().encode(JSON.stringify(data,null,2));
+  const blob = new Blob([buildZip("workout-history.json", bytes)], {type:"application/zip"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "workout-backup-"+new Date().toISOString().slice(0,10)+".zip";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+};
+
+document.getElementById("importBtn").onclick = ()=>document.getElementById("importFile").click();
+document.getElementById("importFile").onchange = async e=>{
+  const file = e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+  try{
+    let text;
+    if(file.name.toLowerCase().endsWith(".json")){
+      text = await file.text();
+    }else{
+      const bytes = parseZip(new Uint8Array(await file.arrayBuffer()));
+      if(!bytes) throw new Error("Not a backup zip from this app");
+      text = new TextDecoder().decode(bytes);
+    }
+    const parsed = JSON.parse(text);
+    if(!parsed || typeof parsed.cats!=="object") throw new Error("No workout data found in this file");
+    if(!confirm("Import this backup? It will REPLACE your current workout data.")) return;
+    data = normalize(parsed);
+    activeCat = CATEGORIES.includes(data.activeCat) || data.activeCat==="Accounts" ? data.activeCat : "Chest";
+    save();
+    location.reload();
+  }catch(err){
+    alert("Import failed: " + err.message);
+  }
+};
+
+/* ================= accounts / music ================= */
+let ytPlayer = null;
+let ytShuffleOn = false;
+
+function parseYtList(str){
+  const m = str.match(/[?&]list=([\w-]+)/);
+  if(m) return m[1];
+  const t = str.trim();
+  return /^[\w-]{10,}$/.test(t) ? t : null;
+}
+function parseSpPlaylist(str){
+  const m = str.match(/playlist[\/:]([A-Za-z0-9]+)/);
+  return m ? m[1] : null;
+}
+
+function buildAccountsPanel(){
+  const acc = document.getElementById("accountsPanel");
+  acc.dataset.built = "1";
+  acc.innerHTML = "";
+  if(!data.music) data.music = {yt:[], sp:[]};
+
+  const ytList = document.createElement("div");
+  ytList.id = "ytListCard";
+
+  const ytPlayerCard = document.createElement("div");
+  ytPlayerCard.id = "ytPlayerCard";
+  ytPlayerCard.className = "session music-section";
+  ytPlayerCard.style.display = "none";
+  const ytBox = document.createElement("div");
+  ytBox.id = "ytPlayerBox";
+  ytPlayerCard.appendChild(ytBox);
+  const ctr = document.createElement("div");
+  ctr.className = "music-controls";
+  ctr.id = "ytControls";
+  [["⏮","prev"],["⏯","toggle"],["⏭","next"],["🔀","shuffle"]].forEach(([txt,act])=>{
+    const b = document.createElement("button");
+    b.textContent = txt;
+    b.onclick = ()=>{
+      if(!ytPlayer) return;
+      if(act==="prev") ytPlayer.previousVideo();
+      else if(act==="next") ytPlayer.nextVideo();
+      else if(act==="toggle"){
+        ytPlayer.getPlayerState()===1 ? ytPlayer.pauseVideo() : ytPlayer.playVideo();
+      }else{
+        ytShuffleOn = !ytShuffleOn;
+        ytPlayer.setShuffle(ytShuffleOn);
+        b.classList.toggle("active", ytShuffleOn);
+        if(ytShuffleOn) ytPlayer.nextVideo();
+      }
+    };
+    ctr.appendChild(b);
+  });
+  ytPlayerCard.appendChild(ctr);
+
+  const spList = document.createElement("div");
+  spList.id = "spListCard";
+
+  const spPlayerCard = document.createElement("div");
+  spPlayerCard.id = "spPlayerCard";
+  spPlayerCard.className = "session music-section";
+  spPlayerCard.style.display = "none";
+  const spBox = document.createElement("div");
+  spBox.id = "spBox";
+  spPlayerCard.appendChild(spBox);
+
+  acc.append(ytList, ytPlayerCard, spList, spPlayerCard);
+  buildMusicLists();
+}
+
+function buildMusicLists(){
+  const buildSection = (title, note, placeholder, onAdd)=>{
+    const card = document.createElement("div");
+    card.className = "session music-section";
+    const h = document.createElement("h3");
+    h.textContent = title;
+    card.appendChild(h);
+    const n = document.createElement("div");
+    n.className = "music-note";
+    n.textContent = note;
+    card.appendChild(n);
+    const inWrap = document.createElement("div");
+    inWrap.className = "custom-ex";
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.placeholder = placeholder;
+    inWrap.appendChild(inp);
+    const btn = document.createElement("button");
+    btn.textContent = "Add";
+    btn.onclick = ()=>{ onAdd(inp.value); inp.value = ""; };
+    inWrap.appendChild(btn);
+    card.appendChild(inWrap);
+    return card;
+  };
+
+  /* --- YouTube --- */
+  const yt = buildSection(
+    "▶️ YouTube",
+    "Paste a playlist link (public or unlisted). Play, shuffle and skip without leaving the app — music keeps going while you log sets.",
+    "https://youtube.com/playlist?list=…",
+    val=>{
+      const id = parseYtList(val);
+      if(!id){ alert("Couldn't find a playlist id in that link."); return; }
+      const name = prompt("Name this playlist:", "My playlist") || id;
+      data.music.yt.push({id, name});
+      save(); buildMusicLists();
+    });
+
+  data.music.yt.forEach((p, i)=>{
+    const row = document.createElement("div");
+    row.className = "preset-row";
+    const label = document.createElement("span");
+    label.textContent = "🎧 " + p.name;
+    row.appendChild(label);
+    const del = document.createElement("button");
+    del.className = "preset-del";
+    del.textContent = "✕";
+    del.onclick = e=>{
+      e.stopPropagation();
+      data.music.yt.splice(i,1);
+      save(); buildMusicLists();
+    };
+    row.appendChild(del);
+    row.onclick = ()=>playYtPlaylist(p.id);
+    yt.appendChild(row);
+  });
+  document.getElementById("ytListCard").replaceChildren(yt);
+
+  /* --- Spotify --- */
+  const sp = buildSection(
+    "🟢 Spotify",
+    "Paste a playlist link. The player has its own controls — sign into Spotify in Safari once and Premium accounts get full songs.",
+    "https://open.spotify.com/playlist/…",
+    val=>{
+      const id = parseSpPlaylist(val);
+      if(!id){ alert("Couldn't find a playlist id in that link."); return; }
+      const name = prompt("Name this playlist:", "My playlist") || id;
+      data.music.sp.push({id, name});
+      save(); buildMusicLists();
+    });
+
+  data.music.sp.forEach((p, i)=>{
+    const row = document.createElement("div");
+    row.className = "preset-row";
+    const label = document.createElement("span");
+    label.textContent = "🎧 " + p.name;
+    row.appendChild(label);
+    const del = document.createElement("button");
+    del.className = "preset-del";
+    del.textContent = "✕";
+    del.onclick = e=>{
+      e.stopPropagation();
+      data.music.sp.splice(i,1);
+      save(); buildMusicLists();
+    };
+    row.appendChild(del);
+    row.onclick = ()=>{
+      document.getElementById("spPlayerCard").style.display = "";
+      document.getElementById("spBox").innerHTML =
+        `<iframe src="https://open.spotify.com/embed/playlist/${p.id}?theme=0" width="100%" height="152" style="border:0;border-radius:12px" allow="autoplay; encrypted-media" loading="lazy"></iframe>`;
+    };
+    sp.appendChild(row);
+  });
+  document.getElementById("spListCard").replaceChildren(sp);
+}
+
+function playYtPlaylist(id){
+  const start = ()=>{
+    document.getElementById("ytPlayerCard").style.display = "";
+    if(ytPlayer && ytPlayer.loadPlaylist){
+      ytPlayer.loadPlaylist({listType:"playlist", list:id});
+      return;
+    }
+    ytPlayer = new YT.Player("ytPlayerBox", {
+      height:"200", width:"100%",
+      playerVars:{listType:"playlist", list:id, playsinline:1},
+      events:{onReady:e=>e.target.playVideo()}
+    });
+  };
+  if(window.YT && window.YT.Player){ start(); return; }
+  window.onYouTubeIframeAPIReady = start;
+  if(!document.getElementById("ytapi")){
+    const s = document.createElement("script");
+    s.id = "ytapi";
+    s.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(s);
+  }
+}
+
 /* ================= timer ================= */
 let timerSec = data.timerSec || 120;   // configured duration
 let remaining = timerSec;
@@ -916,7 +1326,7 @@ document.getElementById("resetBtn").onclick = ()=>{
 
 function gentleBeep(){
   if(navigator.vibrate) navigator.vibrate([200,120,200,120,200]);
-  if(!audioCtx) return;
+  if(!audioCtx || data.soundOn===false) return;
   const now = audioCtx.currentTime;
   for(let i=0;i<3;i++){
     const o = audioCtx.createOscillator();
