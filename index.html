@@ -83,6 +83,7 @@
   .sets-wrap.up .set-input{color:var(--accent); border-color:rgba(74,222,128,.5);}
   .sets-wrap.down .set-input{color:var(--red); border-color:rgba(248,113,113,.5);}
   .ex-del{background:none; border:none; color:var(--dim); font-size:15px; cursor:pointer; padding:4px;}
+  .ex-diff{font-size:12px; font-weight:700; padding:1px 7px; border-radius:9px; white-space:nowrap;}
   .session-actions{display:flex; gap:8px; margin-top:10px;}
   .btn-small{
     flex:1; background:var(--card2); border:1px solid var(--line); color:var(--text);
@@ -179,6 +180,13 @@
     width:100%; background:var(--accent); border:none; color:#06240f;
     border-radius:12px; padding:14px; font-size:15px; font-weight:700; cursor:pointer; margin-bottom:12px;
   }
+  .preset-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--card2); border:1px solid var(--line); border-radius:12px;
+    padding:13px 12px; margin-bottom:8px; font-size:15px; font-weight:600;
+    cursor:pointer; user-select:none; -webkit-user-select:none;
+  }
+  .preset-del{background:none; border:none; color:var(--dim); font-size:15px; cursor:pointer; padding:2px 6px;}
   .ex-option{
     display:flex; align-items:center; justify-content:space-between;
     padding:12px 10px; border-radius:10px; border:1px solid var(--line);
@@ -267,7 +275,7 @@
     <button id="resetBtn">Reset</button>
     <button id="startStopBtn">Start</button>
   </div>
-  <div class="swipe-hint">Swipe right to hide · swipe left anywhere to show</div>
+  <div class="swipe-hint">Swipe right to hide</div>
 </div>
 
 <!-- Exercise picker modal -->
@@ -275,6 +283,7 @@
   <div class="modal">
     <h3 id="pickerTitle">Add exercises</h3>
     <button class="repeat-btn" id="repeatBtn" style="display:none">↻ Repeat last workout</button>
+    <div id="presetList"></div>
     <div class="custom-ex">
       <input id="customExName" type="text" placeholder="Custom exercise name…">
       <button id="customExAdd">Add</button>
@@ -430,15 +439,23 @@ function sessionCard(s, idx, prev){
   head.appendChild(badge);
 
   function refreshDiff(){
+    const diffSpans = card.querySelectorAll(".ex-diff");
     card.querySelectorAll(".sets-wrap").forEach((wrap, ei)=>{
       const ex = s.exercises[ei];
+      const span = diffSpans[ei];
       wrap.classList.remove("up","down");
+      span.style.display = "none";
       if(!prev) return;
       const pex = prev.exercises.find(p=>p.name===ex.name);
       if(pex && sumReps(ex.reps)>0 && sumReps(pex.reps)>0){
         const d = sumReps(ex.reps)-sumReps(pex.reps);
         if(d>0) wrap.classList.add("up");
         else if(d<0) wrap.classList.add("down");
+        if(d!==0){
+          span.className = "ex-diff " + (d>0?"diff-up":"diff-down");
+          span.textContent = (d>0?"▲ +":"▼ ") + d;
+          span.style.display = "";
+        }
       }
     });
     badge.style.display = "none";
@@ -475,6 +492,10 @@ function sessionCard(s, idx, prev){
     nm.className = "ex-name";
     nm.textContent = ex.name;
     exHead.appendChild(nm);
+    const exDiff = document.createElement("span");
+    exDiff.className = "ex-diff";
+    exDiff.style.display = "none";
+    exHead.appendChild(exDiff);
     const x = document.createElement("button");
     x.className = "ex-del";
     x.textContent = "✕";
@@ -594,6 +615,7 @@ function openPicker(opts){
   // back to step 1 layout
   document.querySelector("#pickerScrim .custom-ex").style.display = "";
   document.getElementById("exOptions").style.display = "";
+  document.getElementById("presetList").style.display = "";
   document.getElementById("setsStep").style.display = "none";
   document.getElementById("pickerConfirm").textContent = "Next";
 
@@ -608,9 +630,53 @@ function openPicker(opts){
     save(); closePicker(); renderSessions();
   };
 
+  renderPresetList();
   renderPickerOptions();
   document.getElementById("customExName").value = "";
   document.getElementById("pickerScrim").classList.add("open");
+}
+
+/* ---- named workout presets ---- */
+function getPresets(){
+  const c = data.cats[activeCat];
+  if(!c.presets) c.presets = [];
+  return c.presets;
+}
+
+function renderPresetList(){
+  const box = document.getElementById("presetList");
+  box.innerHTML = "";
+  if(pickerState.mode!=="new") return;
+  getPresets().forEach((p, i)=>{
+    const row = document.createElement("div");
+    row.className = "preset-row";
+    const label = document.createElement("span");
+    label.textContent = "📋 " + p.name;
+    row.appendChild(label);
+    const del = document.createElement("button");
+    del.className = "preset-del";
+    del.textContent = "✕";
+    del.setAttribute("aria-label","Delete preset");
+    del.onclick = e=>{
+      e.stopPropagation();
+      if(confirm(`Delete preset "${p.name}"?`)){
+        getPresets().splice(i,1);
+        save(); renderPresetList();
+      }
+    };
+    row.appendChild(del);
+    row.onclick = ()=>{
+      // start a workout from the preset: its exercises + set counts, weights from last time
+      const sessions = data.cats[activeCat].sessions;
+      const exercises = p.exercises.map(pe=>{
+        const lw = lastWeightFor(pe.name);
+        return {name:pe.name, weight:lw.weight, unit:lw.unit, reps:Array(pe.sets).fill(null)};
+      });
+      sessions.push({date:new Date().toISOString(), exercises, diet:null, sleep:null, finished:false});
+      save(); closePicker(); renderSessions();
+    };
+    box.appendChild(row);
+  });
 }
 
 function showSetsStep(){
@@ -619,6 +685,7 @@ function showSetsStep(){
   document.getElementById("repeatBtn").style.display = "none";
   document.querySelector("#pickerScrim .custom-ex").style.display = "none";
   document.getElementById("exOptions").style.display = "none";
+  document.getElementById("presetList").style.display = "none";
   const box = document.getElementById("setsStep");
   box.style.display = "block";
   box.innerHTML = "";
@@ -645,6 +712,17 @@ function showSetsStep(){
     q.appendChild(rowB);
     box.appendChild(q);
   });
+  // optional: save this workout as a named preset
+  if(pickerState.mode==="new"){
+    const saveWrap = document.createElement("div");
+    saveWrap.className = "custom-ex";
+    const nameInp = document.createElement("input");
+    nameInp.type = "text";
+    nameInp.id = "presetNameInput";
+    nameInp.placeholder = "Save as preset — name (optional)";
+    saveWrap.appendChild(nameInp);
+    box.appendChild(saveWrap);
+  }
   document.getElementById("pickerConfirm").textContent =
     pickerState.mode==="new" ? "Start workout" : "Add";
 }
@@ -690,6 +768,17 @@ document.getElementById("pickerConfirm").onclick = ()=>{
   if(chosen.length===0){ closePicker(); return; }
 
   if(pickerState.step===1){ showSetsStep(); return; }
+
+  // save as a named preset if a name was entered (same name = overwrite)
+  const nameInp = document.getElementById("presetNameInput");
+  const pname = nameInp ? nameInp.value.trim() : "";
+  if(pname){
+    const presets = getPresets();
+    const exs = chosen.map(n=>({name:n, sets:pickerState.setsChoice[n]||DEFAULT_SETS}));
+    const existing = presets.find(p=>p.name.toLowerCase()===pname.toLowerCase());
+    if(existing) existing.exercises = exs;
+    else presets.push({name:pname, exercises:exs});
+  }
 
   const sessions = data.cats[activeCat].sessions;
   // carry over last-used weight + unit for each exercise
@@ -899,7 +988,7 @@ document.getElementById("timerHandle").onclick = ()=>{
 /* ignore scrim taps while the panel is still sliding in (guards against double-fired taps) */
 scrim.onclick = ()=>{ if(Date.now()-panelOpenedAt > 350) closeTimer(); };
 
-/* swipe left anywhere = show, swipe right = hide */
+/* swipe right = hide the timer panel (opening is via the header button only) */
 let touchX=null, touchY=null;
 document.addEventListener("touchstart", e=>{
   touchX = e.touches[0].clientX; touchY = e.touches[0].clientY;
@@ -909,9 +998,7 @@ document.addEventListener("touchend", e=>{
   const dx = e.changedTouches[0].clientX - touchX;
   const dy = e.changedTouches[0].clientY - touchY;
   touchX = null;
-  if(Math.abs(dx)>70 && Math.abs(dx) > 2*Math.abs(dy)){
-    if(dx<0) openTimer(); else closeTimer();
-  }
+  if(dx>70 && dx > 2*Math.abs(dy) && panel.classList.contains("open")) closeTimer();
 },{passive:true});
 
 /* ================= init ================= */
