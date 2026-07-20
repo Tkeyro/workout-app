@@ -89,17 +89,16 @@
   .music-controls button.active{border-color:var(--accent); color:var(--accent);}
 
   /* ---- music bar + category selector ---- */
+  #catBar{display:flex; gap:8px; padding:12px 14px 4px; align-items:stretch;}
   #musicBar{
-    display:block; width:calc(100% - 28px); margin:12px 14px 0;
     background:var(--card); border:1px solid var(--line); color:var(--text);
-    border-radius:12px; padding:12px; font-size:15px; font-weight:600;
-    text-align:left; cursor:pointer;
+    border-radius:12px; padding:0 15px; font-size:18px; cursor:pointer;
   }
   #musicBar.active{background:var(--accent); border-color:var(--accent); color:#06240f;}
-  #catBar{display:flex; gap:8px; padding:12px 14px 4px;}
   #catSelect{
-    flex:1; background:var(--card); border:1px solid var(--line); color:var(--text);
+    flex:1; min-width:0; background:var(--card); border:1px solid var(--line); color:var(--text);
     border-radius:12px; padding:12px 36px 12px 12px; font-size:16px; font-weight:600;
+    text-overflow:ellipsis;
     -webkit-appearance:none; appearance:none; cursor:pointer;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238a97a5' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
     background-repeat:no-repeat; background-position:right 14px center;
@@ -125,6 +124,19 @@
   .del-session{
     background:none; border:none; color:var(--dim); font-size:16px; cursor:pointer; padding:2px 6px;
   }
+  .copy-session{
+    background:none; border:none; color:var(--dim); font-size:16px; cursor:pointer; padding:2px 6px;
+  }
+  .paste-row{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:rgba(74,222,128,.1); border:1px solid var(--accent); border-radius:14px;
+    padding:12px 14px; margin-bottom:12px;
+  }
+  .paste-row .paste-btn{
+    flex:1; text-align:left; background:none; border:none; color:var(--accent);
+    font-size:14px; font-weight:600; cursor:pointer; padding:0;
+  }
+  .paste-row .paste-x{background:none; border:none; color:var(--dim); font-size:15px; cursor:pointer; padding:2px 6px;}
   .exercise{padding:10px 0 12px; border-top:1px solid var(--line);}
   .ex-head{display:flex; align-items:center; gap:8px;}
   .ex-name{flex:1; min-width:0; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -323,6 +335,15 @@
   .rate-btns button.selected{background:var(--accent); border-color:var(--accent); color:#06240f; font-weight:700;}
 
   .empty-note{color:var(--dim); font-size:13px; text-align:center; padding:18px 10px;}
+
+  #toast{
+    position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); transform:translate(-50%,20px);
+    background:var(--card2); border:1px solid var(--accent); color:var(--text);
+    padding:12px 18px; border-radius:12px; font-size:14px; font-weight:600; z-index:60;
+    max-width:88vw; text-align:center; opacity:0; pointer-events:none; transition:opacity .25s, transform .25s;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+  }
+  #toast.show{opacity:1; transform:translate(-50%,0);}
 </style>
 </head>
 <body>
@@ -369,8 +390,8 @@
   </div>
 </div>
 
-<button id="musicBar">🎵 Music</button>
 <div id="catBar">
+  <button id="musicBar">🎵</button>
   <select id="catSelect" aria-label="Muscle group"></select>
   <button id="catRename" aria-label="Rename or delete category">⋯</button>
 </div>
@@ -469,7 +490,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "1.8";
+const APP_VERSION = "1.9";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -562,11 +583,11 @@ document.getElementById("catSelect").onchange = e=>{
       activeCat = name;
     }
     renderCatSelect();
-    if(name && data.cats[name]) { save(); renderSessions(); }
+    if(name && data.cats[name]) { save(); musicOpen=false; setView(); }
     else e.target.value = activeCat;
     return;
   }
-  activeCat = v; save(); renderSessions();
+  activeCat = v; save(); musicOpen=false; setView();
 };
 
 // rename / delete — only for custom categories; base groups are fixed
@@ -596,15 +617,14 @@ document.getElementById("catRename").onclick = ()=>{
 /* switch between the workout view and the music view (music keeps playing when hidden) */
 function setView(){
   const acc = document.getElementById("accountsPanel");
-  const catBar = document.getElementById("catBar");
   const sess = document.getElementById("sessions");
   const bar = document.getElementById("musicBar");
   if(musicOpen){
     if(!acc.dataset.built) buildAccountsPanel();
-    acc.style.display = ""; catBar.style.display = "none"; sess.style.display = "none";
+    acc.style.display = ""; sess.style.display = "none";
     bar.classList.add("active");
   }else{
-    acc.style.display = "none"; catBar.style.display = ""; sess.style.display = "";
+    acc.style.display = "none"; sess.style.display = "";
     bar.classList.remove("active");
     renderSessions();
   }
@@ -622,6 +642,24 @@ function renderSessions(){
   addRow.innerHTML = `<span>New ${esc(activeCat)} workout</span><button aria-label="Add workout">+</button>`;
   addRow.querySelector("button").onclick = ()=>openPicker({mode:"new"});
   wrap.appendChild(addRow);
+
+  // if a workout was copied, offer to paste it into this category
+  if(data.clipboard){
+    const pr = document.createElement("div");
+    pr.className = "paste-row";
+    const btn = document.createElement("button");
+    btn.className = "paste-btn";
+    btn.textContent = `📋 Paste copied workout (from ${data.clipboard.fromCat})`;
+    btn.onclick = pasteWorkout;
+    pr.appendChild(btn);
+    const xx = document.createElement("button");
+    xx.className = "paste-x";
+    xx.textContent = "✕";
+    xx.title = "Discard copied workout";
+    xx.onclick = ()=>{ data.clipboard = null; save(); renderSessions(); };
+    pr.appendChild(xx);
+    wrap.appendChild(pr);
+  }
 
   const sessions = data.cats[activeCat].sessions;
   if(sessions.length===0){
@@ -686,6 +724,14 @@ function sessionCard(s, idx, prev){
       }
     }
   }
+
+  // copy this whole workout (with its recorded data) to paste into any category
+  const copy = document.createElement("button");
+  copy.className = "copy-session";
+  copy.textContent = "📋";
+  copy.title = "Copy this workout";
+  copy.onclick = ()=>copyWorkout(s);
+  head.appendChild(copy);
 
   const del = document.createElement("button");
   del.className = "del-session";
@@ -870,6 +916,41 @@ function sessionCard(s, idx, prev){
 
   refreshDiff();
   return card;
+}
+
+/* ================= copy / paste a whole workout ================= */
+function copyWorkout(s){
+  data.clipboard = {
+    fromCat: activeCat,
+    exercises: JSON.parse(JSON.stringify(s.exercises))   // deep copy incl. reps, weight, goal, timer
+  };
+  save();
+  renderSessions();
+  toast("Workout copied — open any category and press Paste");
+}
+
+function pasteWorkout(){
+  const c = data.clipboard;
+  if(!c) return;
+  const exercises = JSON.parse(JSON.stringify(c.exercises));
+  data.cats[activeCat].sessions.push({date:new Date().toISOString(), exercises, diet:null, sleep:null, finished:false});
+  save();
+  renderSessions();
+  toast("Pasted into " + activeCat);
+}
+
+let toastTimer = null;
+function toast(msg){
+  let t = document.getElementById("toast");
+  if(!t){
+    t = document.createElement("div");
+    t.id = "toast";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 2600);
 }
 
 /* ================= exercise picker ================= */
