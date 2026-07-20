@@ -272,6 +272,8 @@
   .ex-option.selected{border-color:var(--accent); background:rgba(74,222,128,.1);}
   .ex-option .check{color:var(--accent); font-weight:700; opacity:0; font-size:16px;}
   .ex-option.selected .check{opacity:1;}
+  .ex-option.add-option{border-style:dashed; color:var(--accent); font-weight:600;}
+  .ex-empty{color:var(--dim); font-size:13px; text-align:center; padding:10px 4px;}
   .custom-ex{display:flex; gap:8px; margin:4px 0 12px;}
   .custom-ex input{
     flex:1; background:var(--card2); border:1px solid var(--line); color:var(--text);
@@ -417,7 +419,7 @@
     <button class="repeat-btn" id="repeatBtn" style="display:none">↻ Repeat last workout</button>
     <div id="presetList"></div>
     <div class="custom-ex">
-      <input id="customExName" type="text" placeholder="Custom exercise name…">
+      <input id="customExName" type="text" placeholder="Search or add an exercise…" autocomplete="off">
       <button id="customExAdd">Add</button>
     </div>
     <div id="exOptions"></div>
@@ -869,7 +871,7 @@ let pickerState = null;
 const DEFAULT_SETS = 4;
 
 function openPicker(opts){
-  pickerState = {mode:opts.mode, sessionIdx:opts.sessionIdx, selected:new Set(), custom:[], step:1, setsChoice:{}, goalChoice:{}};
+  pickerState = {mode:opts.mode, sessionIdx:opts.sessionIdx, selected:new Set(), custom:[], step:1, setsChoice:{}, goalChoice:{}, search:""};
   const sessions = data.cats[activeCat].sessions;
   const last = sessions[sessions.length-1];
 
@@ -1023,7 +1025,14 @@ function pickerOptionNames(){
 function renderPickerOptions(){
   const box = document.getElementById("exOptions");
   box.innerHTML = "";
-  pickerOptionNames().forEach(name=>{
+  const q = (pickerState.search||"").trim().toLowerCase();
+  const all = pickerOptionNames();
+  const shown = q ? all.filter(n=>n.toLowerCase().includes(q)) : all;
+
+  // keep already-selected items visible even if they don't match the search
+  pickerState.selected.forEach(n=>{ if(!shown.includes(n)) shown.push(n); });
+
+  shown.forEach(name=>{
     const opt = document.createElement("div");
     opt.className = "ex-option" + (pickerState.selected.has(name)?" selected":"");
     opt.innerHTML = `<span>${esc(name)}</span><span class="check">✓</span>`;
@@ -1034,16 +1043,48 @@ function renderPickerOptions(){
     };
     box.appendChild(opt);
   });
+
+  // when the search doesn't exactly match anything, offer to add it as a new exercise
+  const typed = (pickerState.search||"").trim();
+  if(typed && !all.some(n=>n.toLowerCase()===typed.toLowerCase())){
+    const add = document.createElement("div");
+    add.className = "ex-option add-option";
+    add.innerHTML = `<span>➕ Add "${esc(typed)}"</span>`;
+    add.onclick = ()=>addCustomExercise(typed);
+    box.appendChild(add);
+  }else if(shown.length===0){
+    const empty = document.createElement("div");
+    empty.className = "ex-empty";
+    empty.textContent = "No matches — type an exercise name to add it.";
+    box.appendChild(empty);
+  }
 }
 
-document.getElementById("customExAdd").onclick = ()=>{
-  const inp = document.getElementById("customExName");
-  const name = inp.value.trim();
+function addCustomExercise(name){
+  name = name.trim();
   if(!name) return;
-  pickerState.custom.push(name);
-  pickerState.selected.add(name);
-  inp.value = "";
+  // don't duplicate an existing option (match case-insensitively, keep the existing casing)
+  const existing = pickerOptionNames().find(n=>n.toLowerCase()===name.toLowerCase());
+  const finalName = existing || name;
+  if(!existing && !pickerState.custom.includes(finalName)) pickerState.custom.push(finalName);
+  pickerState.selected.add(finalName);
+  pickerState.search = "";
+  document.getElementById("customExName").value = "";
   renderPickerOptions();
+}
+
+const customExInput = document.getElementById("customExName");
+customExInput.oninput = e=>{ pickerState.search = e.target.value; renderPickerOptions(); };
+customExInput.onkeydown = e=>{
+  if(e.key==="Enter"){
+    e.preventDefault();
+    const typed = customExInput.value.trim();
+    if(typed) addCustomExercise(typed);
+  }
+};
+document.getElementById("customExAdd").onclick = ()=>{
+  const typed = customExInput.value.trim();
+  if(typed) addCustomExercise(typed);
 };
 
 document.getElementById("pickerConfirm").onclick = ()=>{
