@@ -469,7 +469,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "1.6";
+const APP_VERSION = "1.7";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1305,6 +1305,12 @@ document.getElementById("importFile").onchange = async e=>{
 let ytPlayer = null;
 let ytShuffleOn = false;
 
+/* run a player command safely — no-op if the player isn't ready or the browser blocks it */
+function ytCall(fn){
+  if(!ytPlayer || typeof ytPlayer.getPlayerState!=="function") return;
+  try{ fn(ytPlayer); }catch(e){}
+}
+
 function parseYtList(str){
   const m = str.match(/[?&]list=([\w-]+)/);
   if(m) return m[1];
@@ -1339,21 +1345,28 @@ function buildAccountsPanel(){
     const b = document.createElement("button");
     b.textContent = txt;
     b.onclick = ()=>{
-      if(!ytPlayer) return;
-      if(act==="prev") ytPlayer.previousVideo();
-      else if(act==="next") ytPlayer.nextVideo();
-      else if(act==="toggle"){
-        ytPlayer.getPlayerState()===1 ? ytPlayer.pauseVideo() : ytPlayer.playVideo();
-      }else{
+      // shuffle toggle is local state, so it still reflects even if the player ignores us
+      if(act==="shuffle"){
         ytShuffleOn = !ytShuffleOn;
-        ytPlayer.setShuffle(ytShuffleOn);
         b.classList.toggle("active", ytShuffleOn);
-        if(ytShuffleOn) ytPlayer.nextVideo();
+        ytCall(p=>{ p.setShuffle(ytShuffleOn); if(ytShuffleOn) p.nextVideo(); });
+        return;
       }
+      if(act==="prev") ytCall(p=>p.previousVideo());
+      else if(act==="next") ytCall(p=>p.nextVideo());
+      else if(act==="toggle") ytCall(p=>{
+        // states: 1=playing → pause; anything else (paused/cued/ended/unstarted) → play
+        (p.getPlayerState && p.getPlayerState()===1) ? p.pauseVideo() : p.playVideo();
+      });
     };
     ctr.appendChild(b);
   });
   ytPlayerCard.appendChild(ctr);
+  const hint = document.createElement("div");
+  hint.className = "music-note";
+  hint.style.marginTop = "8px";
+  hint.textContent = "On iPhone, tap the video's own ▶ / ⏸ once to start — Safari needs that first tap before these buttons can control playback.";
+  ytPlayerCard.appendChild(hint);
 
   const spList = document.createElement("div");
   spList.id = "spListCard";
