@@ -84,18 +84,26 @@
   }
   .music-controls button.active{border-color:var(--accent); color:var(--accent);}
 
-  /* ---- category tabs ---- */
-  #tabs{
-    display:flex; gap:8px; overflow-x:auto; padding:12px 14px 4px;
-    scrollbar-width:none;
+  /* ---- music bar + category selector ---- */
+  #musicBar{
+    display:block; width:calc(100% - 28px); margin:12px 14px 0;
+    background:var(--card); border:1px solid var(--line); color:var(--text);
+    border-radius:12px; padding:12px; font-size:15px; font-weight:600;
+    text-align:left; cursor:pointer;
   }
-  #tabs::-webkit-scrollbar{display:none;}
-  .tab{
-    flex:0 0 auto; padding:9px 16px; border-radius:20px; font-size:14px;
-    background:var(--card); border:1px solid var(--line); color:var(--dim);
-    cursor:pointer; user-select:none; -webkit-user-select:none;
+  #musicBar.active{background:var(--accent); border-color:var(--accent); color:#06240f;}
+  #catBar{display:flex; gap:8px; padding:12px 14px 4px;}
+  #catSelect{
+    flex:1; background:var(--card); border:1px solid var(--line); color:var(--text);
+    border-radius:12px; padding:12px 36px 12px 12px; font-size:16px; font-weight:600;
+    -webkit-appearance:none; appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238a97a5' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 14px center;
   }
-  .tab.active{background:var(--accent); border-color:var(--accent); color:#06240f; font-weight:600;}
+  #catRename{
+    background:var(--card2); border:1px solid var(--line); color:var(--dim);
+    border-radius:12px; padding:0 14px; font-size:16px; cursor:pointer;
+  }
 
   /* ---- sessions ---- */
   #sessions{padding:10px 14px 90px;}
@@ -136,6 +144,23 @@
   .sets-wrap.down .set-input{color:var(--red); border-color:rgba(248,113,113,.5);}
   .ex-del{background:none; border:none; color:var(--dim); font-size:15px; cursor:pointer; padding:4px;}
   .ex-diff{font-size:12px; font-weight:700; padding:1px 7px; border-radius:9px; white-space:nowrap;}
+  .ex-info-btn{background:none; border:none; color:var(--dim); font-size:15px; cursor:pointer; padding:2px 4px; text-decoration:none;}
+  .ex-goal{font-size:11px; color:var(--dim); margin-top:5px;}
+  .set-input.hit{border-color:rgba(74,222,128,.6);}
+  .ex-timerbar{display:flex; align-items:center; gap:8px; margin-top:9px; flex-wrap:wrap;}
+  .ex-timer-toggle{
+    background:var(--card2); border:1px solid var(--line); color:var(--dim);
+    border-radius:8px; padding:7px 10px; font-size:13px; cursor:pointer;
+  }
+  .ex-timer-toggle.on{border-color:var(--accent); color:var(--accent);}
+  .ex-timer-sel{
+    background:var(--card2); border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:7px; font-size:13px;
+  }
+  .ex-timer-load{
+    background:var(--accent); border:none; color:#06240f; border-radius:8px;
+    padding:7px 12px; font-size:13px; font-weight:700; cursor:pointer;
+  }
   .session-actions{display:flex; gap:8px; margin-top:10px;}
   .btn-small{
     flex:1; background:var(--card2); border:1px solid var(--line); color:var(--text);
@@ -271,6 +296,16 @@
     border-radius:10px; padding:12px 0; font-size:16px; cursor:pointer;
   }
   .sets-count button.selected{background:var(--accent); border-color:var(--accent); color:#06240f; font-weight:700;}
+  .goal-row{display:flex; align-items:center; gap:10px; margin-top:10px;}
+  .goal-row label{font-size:13px; color:var(--dim);}
+  .goal-input{
+    width:74px; background:var(--card2); border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:10px; font-size:15px; text-align:center;
+  }
+
+  .volume-row{display:flex; align-items:center; gap:10px; padding:0 2px;}
+  .volume-row input[type=range]{flex:1; accent-color:var(--accent);}
+  .volume-row .vlabel{font-size:16px;}
 
   .rate-row{margin-bottom:16px;}
   .rate-row .q{font-size:14px; margin-bottom:8px; color:var(--dim);}
@@ -326,7 +361,11 @@
   </div>
 </div>
 
-<div id="tabs"></div>
+<button id="musicBar">🎵 Music</button>
+<div id="catBar">
+  <select id="catSelect" aria-label="Muscle group"></select>
+  <button id="catRename" aria-label="Rename or delete category">⋯</button>
+</div>
 <div id="sessions"></div>
 <div id="accountsPanel" style="display:none"></div>
 
@@ -359,6 +398,10 @@
   <div id="recentSection">
     <div class="recent-title">Recent timers</div>
     <div id="recentList"></div>
+  </div>
+  <div class="volume-row">
+    <span class="vlabel">🔊</span>
+    <input type="range" id="volSlider" min="0" max="100" value="60" aria-label="Timer volume">
   </div>
   <div class="timer-btns">
     <button id="resetBtn">Reset</button>
@@ -419,21 +462,35 @@ const LIBRARY = {
 };
 const STORE_KEY = "workoutTrackerData_v1";
 
+/* every exercise known to the app, for custom categories that mix muscle groups */
+function allLibraryExercises(){
+  const out = [];
+  Object.values(LIBRARY).forEach(arr=>arr.forEach(n=>{ if(!out.includes(n)) out.push(n); }));
+  return out.sort();
+}
+function allCats(){ return [...CATEGORIES, ...(data.customCats||[])]; }
+function isCustomCat(name){ return !CATEGORIES.includes(name); }
+
 let data = load();
-let activeCat = data.activeCat || "Chest";
+let activeCat = allCats().includes(data.activeCat) ? data.activeCat : "Chest";
+let musicOpen = false;
 
 function load(){
   try{
     const raw = localStorage.getItem(STORE_KEY);
     if(raw) return normalize(JSON.parse(raw));
   }catch(e){}
-  const d = {activeCat:"Chest", timerSec:120, cats:{}};
+  const d = {activeCat:"Chest", timerSec:120, cats:{}, customCats:[]};
   CATEGORIES.forEach(c => d.cats[c] = {sessions:[]});
   return d;
 }
 
 /* upgrade exercises saved in the old "7/7/7/7" string format */
 function normalize(d){
+  if(!Array.isArray(d.customCats)) d.customCats = [];
+  if(!d.cats) d.cats = {};
+  // make sure every base + custom category has a bucket
+  [...CATEGORIES, ...d.customCats].forEach(c=>{ if(!d.cats[c]) d.cats[c] = {sessions:[]}; });
   Object.values(d.cats||{}).forEach(cat=>(cat.sessions||[]).forEach(s=>s.exercises.forEach(e=>{
     if(typeof e.reps==="string"){
       const nums = e.reps.split(/[\/,\s]+/).map(x=>parseInt(x,10)).filter(n=>!isNaN(n));
@@ -469,32 +526,86 @@ function esc(s){
   return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
-/* ================= render tabs ================= */
-function renderTabs(){
-  const el = document.getElementById("tabs");
-  el.innerHTML = "";
-  [...CATEGORIES, "Accounts"].forEach(c=>{
-    const b = document.createElement("div");
-    b.className = "tab" + (c===activeCat?" active":"");
-    b.textContent = c==="Accounts" ? "🎵 Accounts" : c;
-    b.onclick = ()=>{ activeCat=c; save(); renderTabs(); renderSessions(); };
-    el.appendChild(b);
+/* ================= category selector + view toggle ================= */
+const NEW_CAT = "__new__";
+
+function renderCatSelect(){
+  const sel = document.getElementById("catSelect");
+  sel.innerHTML = "";
+  allCats().forEach(c=>{
+    const o = document.createElement("option");
+    o.value = c; o.textContent = c;
+    if(c===activeCat) o.selected = true;
+    sel.appendChild(o);
   });
+  const o = document.createElement("option");
+  o.value = NEW_CAT; o.textContent = "➕ New custom category…";
+  sel.appendChild(o);
 }
+
+document.getElementById("catSelect").onchange = e=>{
+  const v = e.target.value;
+  if(v===NEW_CAT){
+    const name = (prompt("Name your custom category (e.g. Biceps & Back):")||"").trim();
+    if(name && !allCats().includes(name)){
+      data.customCats.push(name);
+      data.cats[name] = {sessions:[]};
+      activeCat = name;
+    }
+    renderCatSelect();
+    if(name && data.cats[name]) { save(); renderSessions(); }
+    else e.target.value = activeCat;
+    return;
+  }
+  activeCat = v; save(); renderSessions();
+};
+
+// rename / delete — only for custom categories; base groups are fixed
+document.getElementById("catRename").onclick = ()=>{
+  if(!isCustomCat(activeCat)){
+    alert("The five standard muscle groups can't be renamed. Create a custom category from the dropdown to mix groups.");
+    return;
+  }
+  const newName = (prompt("Rename this category (leave blank to delete it):", activeCat) || "").trim();
+  if(newName===""){
+    if(confirm(`Delete category "${activeCat}" and its history?`)){
+      delete data.cats[activeCat];
+      data.customCats = data.customCats.filter(c=>c!==activeCat);
+      activeCat = "Chest";
+      save(); renderCatSelect(); renderSessions();
+    }
+    return;
+  }
+  if(newName===activeCat || allCats().includes(newName)) return;
+  data.cats[newName] = data.cats[activeCat];
+  data.customCats = data.customCats.map(c=>c===activeCat?newName:c);
+  delete data.cats[activeCat];
+  activeCat = newName;
+  save(); renderCatSelect(); renderSessions();
+};
+
+/* switch between the workout view and the music view (music keeps playing when hidden) */
+function setView(){
+  const acc = document.getElementById("accountsPanel");
+  const catBar = document.getElementById("catBar");
+  const sess = document.getElementById("sessions");
+  const bar = document.getElementById("musicBar");
+  if(musicOpen){
+    if(!acc.dataset.built) buildAccountsPanel();
+    acc.style.display = ""; catBar.style.display = "none"; sess.style.display = "none";
+    bar.classList.add("active");
+  }else{
+    acc.style.display = "none"; catBar.style.display = ""; sess.style.display = "";
+    bar.classList.remove("active");
+    renderSessions();
+  }
+}
+document.getElementById("musicBar").onclick = ()=>{ musicOpen = !musicOpen; setView(); };
 
 /* ================= render sessions ================= */
 function renderSessions(){
   const wrap = document.getElementById("sessions");
-  const acc = document.getElementById("accountsPanel");
   wrap.innerHTML = "";
-
-  // the Accounts panel is persistent (hidden, not destroyed) so music keeps playing on other tabs
-  if(activeCat==="Accounts"){
-    if(!acc.dataset.built) buildAccountsPanel();
-    acc.style.display = "";
-    return;
-  }
-  acc.style.display = "none";
 
   // the "empty row" with a + on the right
   const addRow = document.createElement("div");
@@ -590,6 +701,15 @@ function sessionCard(s, idx, prev){
     nm.className = "ex-name";
     nm.textContent = ex.name;
     exHead.appendChild(nm);
+    // ⓘ how-to: opens a YouTube search for the exercise
+    const info = document.createElement("a");
+    info.className = "ex-info-btn";
+    info.textContent = "ⓘ";
+    info.title = "How to do " + ex.name;
+    info.href = "https://www.youtube.com/results?search_query=" + encodeURIComponent("how to do " + ex.name + " exercise proper form");
+    info.target = "_blank";
+    info.rel = "noopener";
+    exHead.appendChild(info);
     const exDiff = document.createElement("span");
     exDiff.className = "ex-diff";
     exDiff.style.display = "none";
@@ -636,32 +756,78 @@ function sessionCard(s, idx, prev){
     // one numeric box per set; tapping an empty box auto-fills the previous set's reps
     const setsWrap = document.createElement("div");
     setsWrap.className = "sets-wrap";
+    const markHit = (inp,v)=>{ inp.classList.toggle("hit", ex.goal && v!=="" && parseInt(v,10)>=ex.goal); };
     ex.reps.forEach((val, i)=>{
       const inp = document.createElement("input");
       inp.className = "set-input";
       inp.type = "text";
       inp.inputMode = "numeric";
       inp.maxLength = 3;
+      inp.placeholder = ex.goal ? String(ex.goal) : "";
       inp.value = (val===null || val===undefined) ? "" : val;
+      markHit(inp, inp.value);
       inp.onfocus = ()=>{
         if(inp.value==="" && i>0 && ex.reps[i-1]!=null){
           inp.value = ex.reps[i-1];
           ex.reps[i] = ex.reps[i-1];
           save(); refreshDiff();
         }
+        markHit(inp, inp.value);
         inp.select();
       };
       inp.oninput = ()=>{
         const v = inp.value.replace(/\D/g,"");
         if(v!==inp.value) inp.value = v;
         ex.reps[i] = v==="" ? null : parseInt(v,10);
+        markHit(inp, v);
         save(); refreshDiff();
       };
       setsWrap.appendChild(inp);
     });
     controls.appendChild(setsWrap);
-
     row.appendChild(controls);
+
+    // goal reps label
+    if(ex.goal){
+      const g = document.createElement("div");
+      g.className = "ex-goal";
+      g.textContent = "🎯 Goal: " + ex.goal + " reps/set";
+      row.appendChild(g);
+    }
+
+    // per-exercise rest timer: toggle on, pick a duration, load it into the main timer
+    const tbar = document.createElement("div");
+    tbar.className = "ex-timerbar";
+    const toggle = document.createElement("button");
+    toggle.className = "ex-timer-toggle" + (ex.timer ? " on" : "");
+    toggle.textContent = ex.timer ? "⏱ Rest timer on" : "⏱ Add rest timer";
+    toggle.onclick = ()=>{
+      ex.timer = ex.timer ? null : (timerSec || 90);
+      save(); renderSessions();
+    };
+    tbar.appendChild(toggle);
+    if(ex.timer){
+      const sel = document.createElement("select");
+      sel.className = "ex-timer-sel";
+      [30,45,60,90,120,150,180,240,300].forEach(sc=>{
+        const o = document.createElement("option");
+        o.value = sc; o.textContent = fmtTime(sc);
+        if(sc===ex.timer) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = ()=>{ ex.timer = parseInt(sel.value,10); save(); };
+      tbar.appendChild(sel);
+      const load = document.createElement("button");
+      load.className = "ex-timer-load";
+      load.textContent = "▶ Load timer";
+      load.onclick = ()=>{
+        setDuration(ex.timer);   // load duration, don't auto-start
+        openTimer();             // opens the panel and waits for Start
+      };
+      tbar.appendChild(load);
+    }
+    row.appendChild(tbar);
+
     card.appendChild(row);
   });
 
@@ -703,7 +869,7 @@ let pickerState = null;
 const DEFAULT_SETS = 4;
 
 function openPicker(opts){
-  pickerState = {mode:opts.mode, sessionIdx:opts.sessionIdx, selected:new Set(), custom:[], step:1, setsChoice:{}};
+  pickerState = {mode:opts.mode, sessionIdx:opts.sessionIdx, selected:new Set(), custom:[], step:1, setsChoice:{}, goalChoice:{}};
   const sessions = data.cats[activeCat].sessions;
   const last = sessions[sessions.length-1];
 
@@ -722,7 +888,8 @@ function openPicker(opts){
   repeatBtn.onclick = ()=>{
     // copy exercises, weights, units and set counts from last session, clear the reps
     const exercises = last.exercises.map(e=>({
-      name:e.name, weight:e.weight, unit:e.unit||"lbs", reps:Array(e.reps.length).fill(null)
+      name:e.name, weight:e.weight, unit:e.unit||"lbs", goal:e.goal||null, timer:e.timer||null,
+      reps:Array(e.reps.length).fill(null)
     }));
     sessions.push({date:new Date().toISOString(), exercises, diet:null, sleep:null, finished:false});
     save(); closePicker(); renderSessions();
@@ -768,7 +935,7 @@ function renderPresetList(){
       const sessions = data.cats[activeCat].sessions;
       const exercises = p.exercises.map(pe=>{
         const lw = lastWeightFor(pe.name);
-        return {name:pe.name, weight:lw.weight, unit:lw.unit, reps:Array(pe.sets).fill(null)};
+        return {name:pe.name, weight:lw.weight, unit:lw.unit, goal:pe.goal||null, reps:Array(pe.sets).fill(null)};
       });
       sessions.push({date:new Date().toISOString(), exercises, diet:null, sleep:null, finished:false});
       save(); closePicker(); renderSessions();
@@ -808,6 +975,23 @@ function showSetsStep(){
       rowB.appendChild(b);
     }
     q.appendChild(rowB);
+    // goal reps (optional)
+    const goalRow = document.createElement("div");
+    goalRow.className = "goal-row";
+    const gl = document.createElement("label");
+    gl.textContent = "🎯 Goal reps:";
+    goalRow.appendChild(gl);
+    const gi = document.createElement("input");
+    gi.className = "goal-input";
+    gi.type = "text";
+    gi.inputMode = "numeric";
+    gi.placeholder = "—";
+    gi.oninput = ()=>{
+      gi.value = gi.value.replace(/\D/g,"");
+      pickerState.goalChoice[name] = gi.value ? parseInt(gi.value,10) : null;
+    };
+    goalRow.appendChild(gi);
+    q.appendChild(goalRow);
     box.appendChild(q);
   });
   // optional: save this workout as a named preset
@@ -826,7 +1010,8 @@ function showSetsStep(){
 }
 
 function pickerOptionNames(){
-  const names = [...LIBRARY[activeCat]];
+  // custom categories can pick from every muscle group; base ones from their own library
+  const names = isCustomCat(activeCat) ? allLibraryExercises() : [...LIBRARY[activeCat]];
   // include any custom names used before in this category
   data.cats[activeCat].sessions.forEach(s=>s.exercises.forEach(e=>{
     if(!names.includes(e.name)) names.push(e.name);
@@ -872,7 +1057,7 @@ document.getElementById("pickerConfirm").onclick = ()=>{
   const pname = nameInp ? nameInp.value.trim() : "";
   if(pname){
     const presets = getPresets();
-    const exs = chosen.map(n=>({name:n, sets:pickerState.setsChoice[n]||DEFAULT_SETS}));
+    const exs = chosen.map(n=>({name:n, sets:pickerState.setsChoice[n]||DEFAULT_SETS, goal:pickerState.goalChoice[n]||null}));
     const existing = presets.find(p=>p.name.toLowerCase()===pname.toLowerCase());
     if(existing) existing.exercises = exs;
     else presets.push({name:pname, exercises:exs});
@@ -882,7 +1067,8 @@ document.getElementById("pickerConfirm").onclick = ()=>{
   // carry over last-used weight + unit for each exercise
   const mk = name=>{
     const lw = lastWeightFor(name);
-    return {name, weight:lw.weight, unit:lw.unit, reps:Array(pickerState.setsChoice[name]||DEFAULT_SETS).fill(null)};
+    return {name, weight:lw.weight, unit:lw.unit, goal:pickerState.goalChoice[name]||null,
+      reps:Array(pickerState.setsChoice[name]||DEFAULT_SETS).fill(null)};
   };
 
   if(pickerState.mode==="new"){
@@ -1058,7 +1244,7 @@ document.getElementById("importFile").onchange = async e=>{
     if(!parsed || typeof parsed.cats!=="object") throw new Error("No workout data found in this file");
     if(!confirm("Import this backup? It will REPLACE your current workout data.")) return;
     data = normalize(parsed);
-    activeCat = CATEGORIES.includes(data.activeCat) || data.activeCat==="Accounts" ? data.activeCat : "Chest";
+    activeCat = allCats().includes(data.activeCat) ? data.activeCat : "Chest";
     save();
     location.reload();
   }catch(err){
@@ -1324,9 +1510,13 @@ document.getElementById("resetBtn").onclick = ()=>{
   updateDisplay();
 };
 
+function timerVolume(){ return data.timerVolume==null ? 0.6 : data.timerVolume; }
+
 function gentleBeep(){
   if(navigator.vibrate) navigator.vibrate([200,120,200,120,200]);
-  if(!audioCtx || data.soundOn===false) return;
+  const vol = timerVolume();
+  if(!audioCtx || data.soundOn===false || vol<=0) return;
+  const peak = 0.3 * vol;
   const now = audioCtx.currentTime;
   for(let i=0;i<3;i++){
     const o = audioCtx.createOscillator();
@@ -1335,12 +1525,34 @@ function gentleBeep(){
     o.frequency.value = 830;
     const t = now + i*0.55;
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.18, t+0.06);
+    g.gain.linearRampToValueAtTime(peak, t+0.06);
     g.gain.exponentialRampToValueAtTime(0.001, t+0.45);
     o.connect(g).connect(audioCtx.destination);
     o.start(t); o.stop(t+0.5);
   }
 }
+
+/* short preview beep so the slider gives instant feedback */
+function previewBeep(){
+  const vol = timerVolume();
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==="suspended") audioCtx.resume();
+  if(vol<=0) return;
+  const now = audioCtx.currentTime;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = "sine"; o.frequency.value = 830;
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(0.3*vol, now+0.04);
+  g.gain.exponentialRampToValueAtTime(0.001, now+0.3);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(now); o.stop(now+0.32);
+}
+
+const volSlider = document.getElementById("volSlider");
+volSlider.value = Math.round(timerVolume()*100);
+volSlider.oninput = ()=>{ data.timerVolume = volSlider.value/100; save(); };
+volSlider.onchange = ()=>previewBeep();
 
 /* ---- recent timers ---- */
 const MAX_UNSTARRED_RECENTS = 5;
@@ -1415,8 +1627,8 @@ document.addEventListener("touchend", e=>{
 remaining = timerSec;
 updateDisplay();
 renderRecentTimers();
-renderTabs();
-renderSessions();
+renderCatSelect();
+setView();
 </script>
 </body>
 </html>
