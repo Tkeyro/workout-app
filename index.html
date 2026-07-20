@@ -338,7 +338,7 @@
 <div id="menuDrawer">
   <h2>Menu</h2>
   <div class="menu-item" id="miSettings">⚙️ Settings</div>
-  <div class="menu-item" id="miLogs">📄 Logs</div>
+  <div class="menu-item" id="miLogs">🗂 User Data</div>
   <div id="menuVersion"></div>
 </div>
 
@@ -348,7 +348,6 @@
     <h3>Settings</h3>
     <label class="setting-row"><span>Timer sound</span><input type="checkbox" id="soundToggle"></label>
     <div class="setting-row"><span>Version</span><span id="settingsVersion" style="color:var(--dim)"></span></div>
-    <button class="danger-btn" id="clearDataBtn">Clear all workout data</button>
     <div class="modal-actions">
       <button class="modal-cancel" id="settingsClose">Close</button>
     </div>
@@ -358,11 +357,12 @@
 <!-- Logs modal -->
 <div class="modal-scrim" id="logsScrim">
   <div class="modal">
-    <h3>Logs</h3>
+    <h3>User Data</h3>
     <p class="music-note">Back up everything — workout history, presets, timers and settings — to a zip file you can keep, or restore from one.</p>
     <button class="repeat-btn" id="exportBtn">⬇ Save backup (.zip)</button>
     <button class="wide-btn" id="importBtn">⬆ Import backup…</button>
     <input type="file" id="importFile" accept=".zip,.json" style="display:none">
+    <button class="danger-btn" id="clearDataBtn">Clear all workout data</button>
     <div class="modal-actions">
       <button class="modal-cancel" id="logsClose">Close</button>
     </div>
@@ -469,7 +469,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "1.7";
+const APP_VERSION = "1.8";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1196,7 +1196,7 @@ document.getElementById("miSettings").onclick = ()=>{
 document.getElementById("settingsClose").onclick = ()=>document.getElementById("settingsScrim").classList.remove("open");
 document.getElementById("soundToggle").onchange = e=>{ data.soundOn = e.target.checked; save(); };
 document.getElementById("clearDataBtn").onclick = ()=>{
-  if(confirm("Delete ALL workout history, presets and timers? This cannot be undone.")){
+  if(confirm("Are you really sure? This can't be undone.")){
     localStorage.removeItem(STORE_KEY);
     location.reload();
   }
