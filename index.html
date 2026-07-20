@@ -46,6 +46,10 @@
   }
   #menuDrawer.open{transform:translateX(0);}
   #menuDrawer h2{margin:0 0 14px; font-size:16px; color:var(--dim); font-weight:600;}
+  #menuVersion{
+    position:absolute; bottom:calc(16px + env(safe-area-inset-bottom)); left:14px; right:14px;
+    font-size:12px; color:var(--dim); text-align:center;
+  }
   .menu-item{
     padding:14px 12px; border-radius:12px; font-size:15px; font-weight:600;
     cursor:pointer; user-select:none; -webkit-user-select:none;
@@ -335,6 +339,7 @@
   <h2>Menu</h2>
   <div class="menu-item" id="miSettings">⚙️ Settings</div>
   <div class="menu-item" id="miLogs">📄 Logs</div>
+  <div id="menuVersion"></div>
 </div>
 
 <!-- Settings modal -->
@@ -342,6 +347,7 @@
   <div class="modal">
     <h3>Settings</h3>
     <label class="setting-row"><span>Timer sound</span><input type="checkbox" id="soundToggle"></label>
+    <div class="setting-row"><span>Version</span><span id="settingsVersion" style="color:var(--dim)"></span></div>
     <button class="danger-btn" id="clearDataBtn">Clear all workout data</button>
     <div class="modal-actions">
       <button class="modal-cancel" id="settingsClose">Close</button>
@@ -463,6 +469,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
+const APP_VERSION = "1.6";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1183,6 +1190,7 @@ menuScrim.onclick = closeMenu;
 document.getElementById("miSettings").onclick = ()=>{
   closeMenu();
   document.getElementById("soundToggle").checked = data.soundOn!==false;
+  document.getElementById("settingsVersion").textContent = "v" + APP_VERSION;
   document.getElementById("settingsScrim").classList.add("open");
 };
 document.getElementById("settingsClose").onclick = ()=>document.getElementById("settingsScrim").classList.remove("open");
@@ -1665,6 +1673,7 @@ document.addEventListener("touchend", e=>{
 },{passive:true});
 
 /* ================= init ================= */
+document.getElementById("menuVersion").textContent = "Version " + APP_VERSION;
 remaining = timerSec;
 updateDisplay();
 renderRecentTimers();
