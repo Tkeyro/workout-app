@@ -491,7 +491,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "2.1";
+const APP_VERSION = "2.2";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1526,6 +1526,7 @@ function buildMusicLists(){
     del.textContent = "✕";
     del.onclick = e=>{
       e.stopPropagation();
+      if(!confirm(`Remove "${p.name}"? Are you sure?`)) return;
       data.music.yt.splice(i,1);
       save(); buildMusicLists();
     };
@@ -1569,6 +1570,7 @@ function buildMusicLists(){
     del.textContent = "✕";
     del.onclick = e=>{
       e.stopPropagation();
+      if(!confirm(`Remove "${p.name}"? Are you sure?`)) return;
       data.music.sp.splice(i,1);
       save(); buildMusicLists();
     };
