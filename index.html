@@ -491,7 +491,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "2.5";
+const APP_VERSION = "2.6";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1415,6 +1415,11 @@ function parseYtList(str){
   const t = str.trim();
   return /^[\w-]{10,}$/.test(t) ? t : null;
 }
+// a seed video id, if the link was copied while a video/Mix was playing
+function parseYtVideo(str){
+  const m = str.match(/[?&]v=([\w-]{6,})/) || str.match(/youtu\.be\/([\w-]{6,})/);
+  return m ? m[1] : null;
+}
 function parseSpPlaylist(str){
   const m = str.match(/playlist[\/:]([A-Za-z0-9]+)/);
   return m ? m[1] : null;
@@ -1514,8 +1519,17 @@ function buildMusicLists(){
     val=>{
       const id = parseYtList(val);
       if(!id){ alert("Couldn't find a playlist id in that link."); return; }
+      if(/^(WL|LL)$/i.test(id)){
+        alert("That's your Watch Later or Liked videos — YouTube only opens those inside your own account, so they can't be added by link. Use a normal playlist (Public or Unlisted) instead.");
+        return;
+      }
+      const vid = parseYtVideo(val);   // seed video, needed for Mixes/radio (list ids starting with RD)
+      if(/^RD/i.test(id) && !vid){
+        alert("That looks like a YouTube Mix/radio. Those need the video too — while the Mix is playing, use Share on the video and paste that link (it includes both the video and the mix).");
+        return;
+      }
       const name = prompt("Name this playlist:", "My playlist") || id;
-      data.music.yt.push({id, name});
+      data.music.yt.push({id, name, vid});
       save(); buildMusicLists();
     });
 
@@ -1531,12 +1545,16 @@ function buildMusicLists(){
     openApp.className = "preset-del";
     openApp.textContent = "↗";
     openApp.title = "Open in YouTube app";
-    openApp.href = "https://www.youtube.com/playlist?list=" + encodeURIComponent(p.id);
+    // with a seed video, open as a "watch" URL so it plays (and Mixes work); otherwise the playlist page
+    const ytPath = p.vid
+      ? `watch?v=${encodeURIComponent(p.vid)}&list=${encodeURIComponent(p.id)}`
+      : `playlist?list=${encodeURIComponent(p.id)}`;
+    openApp.href = "https://www.youtube.com/" + ytPath;
     openApp.style.textDecoration = "none";
     openApp.onclick = e=>{
       e.preventDefault(); e.stopPropagation();
       // the youtube:// app scheme routes into the app more reliably than a blank-target web link
-      openExternalApp("youtube://www.youtube.com/playlist?list=" + p.id, openApp.href);
+      openExternalApp("youtube://www.youtube.com/" + ytPath, openApp.href);
     };
     row.appendChild(openApp);
     const edit = document.createElement("button");
