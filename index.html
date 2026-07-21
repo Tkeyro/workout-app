@@ -491,7 +491,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "2.6";
+const APP_VERSION = "2.7";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1394,18 +1394,9 @@ function ytCall(fn){
   try{ fn(ytPlayer); }catch(e){}
 }
 
-/* open a playlist in its native app; fall back to the web link if the app isn't installed */
-function openExternalApp(appUrl, webUrl){
-  let switched = false;
-  const mark = ()=>{ switched = true; };
-  document.addEventListener("visibilitychange", mark, {once:true});
-  window.addEventListener("pagehide", mark, {once:true});
-  // if the app didn't take over (still visible after a beat), open the web page instead
-  setTimeout(()=>{
-    document.removeEventListener("visibilitychange", mark);
-    window.removeEventListener("pagehide", mark);
-    if(!switched && !document.hidden) window.location.href = webUrl;
-  }, 1100);
+/* open a playlist straight in its native app via the app's URL scheme.
+   iOS launches the app and leaves this page as-is — no browser navigation. */
+function openExternalApp(appUrl){
   window.location.href = appUrl;
 }
 
@@ -1554,7 +1545,7 @@ function buildMusicLists(){
     openApp.onclick = e=>{
       e.preventDefault(); e.stopPropagation();
       // the youtube:// app scheme routes into the app more reliably than a blank-target web link
-      openExternalApp("youtube://www.youtube.com/" + ytPath, openApp.href);
+      openExternalApp("youtube://www.youtube.com/" + ytPath);
     };
     row.appendChild(openApp);
     const edit = document.createElement("button");
@@ -1611,7 +1602,7 @@ function buildMusicLists(){
     openApp.onclick = e=>{
       e.preventDefault(); e.stopPropagation();
       // spotify:playlist:ID opens straight to the playlist in the app
-      openExternalApp("spotify:playlist:" + p.id, openApp.href);
+      openExternalApp("spotify:playlist:" + p.id);
     };
     row.appendChild(openApp);
     const edit = document.createElement("button");
