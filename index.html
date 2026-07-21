@@ -491,7 +491,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "2.3";
+const APP_VERSION = "2.4";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1550,7 +1550,7 @@ function buildMusicLists(){
   /* --- Spotify --- */
   const sp = buildSection(
     "🟢 Spotify",
-    "Paste a playlist link. The player has its own controls — sign into Spotify in Safari once and Premium accounts get full songs.",
+    "Paste a playlist link. Tap a saved playlist to play it here, or tap ↗ to open it in the Spotify app (which keeps playing in the background). Sign into Spotify once and Premium accounts get full songs.",
     "https://open.spotify.com/playlist/…",
     val=>{
       const id = parseSpPlaylist(val);
@@ -1566,6 +1566,17 @@ function buildMusicLists(){
     const label = document.createElement("span");
     label.textContent = "🎧 " + p.name;
     row.appendChild(label);
+    // open this playlist in the native Spotify app (for background playback)
+    const openApp = document.createElement("a");
+    openApp.className = "preset-del";
+    openApp.textContent = "↗";
+    openApp.title = "Open in Spotify app";
+    openApp.href = "https://open.spotify.com/playlist/" + encodeURIComponent(p.id);
+    openApp.target = "_blank";
+    openApp.rel = "noopener";
+    openApp.style.textDecoration = "none";
+    openApp.onclick = e=>e.stopPropagation();
+    row.appendChild(openApp);
     const edit = document.createElement("button");
     edit.className = "preset-del";
     edit.textContent = "✏️";
@@ -1641,12 +1652,17 @@ const display = document.getElementById("timerDisplay");
 const startStopBtn = document.getElementById("startStopBtn");
 const panel = document.getElementById("timerPanel");
 const scrim = document.getElementById("timerScrim");
+const headerTitle = document.querySelector("header h1");
 
 function fmtTime(sec){
   const m = Math.floor(sec/60), s = sec%60;
   return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
 }
-function updateDisplay(){ display.textContent = fmtTime(remaining); }
+// while the timer is running the header shows the live countdown, otherwise the app title
+function refreshHeader(){
+  headerTitle.textContent = timerInterval ? ("⏱ " + fmtTime(remaining)) : "💪 Workout Tracker";
+}
+function updateDisplay(){ display.textContent = fmtTime(remaining); refreshHeader(); }
 
 function setDuration(sec){
   timerSec = Math.max(5, Math.min(sec, 99*60+59));
@@ -1693,6 +1709,7 @@ function stopTimer(){
   timerInterval = null;
   startStopBtn.textContent = "Start";
   startStopBtn.classList.remove("running");
+  refreshHeader();   // revert the header title now that nothing is running
 }
 document.getElementById("resetBtn").onclick = ()=>{
   stopTimer();
