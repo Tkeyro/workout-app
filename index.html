@@ -491,7 +491,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "2.0";
+const APP_VERSION = "2.1";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1511,6 +1511,16 @@ function buildMusicLists(){
     const label = document.createElement("span");
     label.textContent = "🎧 " + p.name;
     row.appendChild(label);
+    const edit = document.createElement("button");
+    edit.className = "preset-del";
+    edit.textContent = "✏️";
+    edit.title = "Rename playlist";
+    edit.onclick = e=>{
+      e.stopPropagation();
+      const nn = (prompt("Rename playlist:", p.name)||"").trim();
+      if(nn){ p.name = nn; save(); buildMusicLists(); }
+    };
+    row.appendChild(edit);
     const del = document.createElement("button");
     del.className = "preset-del";
     del.textContent = "✕";
@@ -1544,6 +1554,16 @@ function buildMusicLists(){
     const label = document.createElement("span");
     label.textContent = "🎧 " + p.name;
     row.appendChild(label);
+    const edit = document.createElement("button");
+    edit.className = "preset-del";
+    edit.textContent = "✏️";
+    edit.title = "Rename playlist";
+    edit.onclick = e=>{
+      e.stopPropagation();
+      const nn = (prompt("Rename playlist:", p.name)||"").trim();
+      if(nn){ p.name = nn; save(); buildMusicLists(); }
+    };
+    row.appendChild(edit);
     const del = document.createElement("button");
     del.className = "preset-del";
     del.textContent = "✕";
