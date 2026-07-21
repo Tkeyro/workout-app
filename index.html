@@ -491,7 +491,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "2.2";
+const APP_VERSION = "2.3";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1494,7 +1494,7 @@ function buildMusicLists(){
   /* --- YouTube --- */
   const yt = buildSection(
     "▶️ YouTube",
-    "Paste a playlist link (public or unlisted). Play, shuffle and skip without leaving the app — music keeps going while you log sets.",
+    "Paste a playlist link (public or unlisted). Tap a saved playlist to play it in the app, or tap ↗ to open it in the YouTube app (which keeps playing in the background).",
     "https://youtube.com/playlist?list=…",
     val=>{
       const id = parseYtList(val);
@@ -1511,6 +1511,17 @@ function buildMusicLists(){
     const label = document.createElement("span");
     label.textContent = "🎧 " + p.name;
     row.appendChild(label);
+    // open this playlist in the native YouTube app (for background playback)
+    const openApp = document.createElement("a");
+    openApp.className = "preset-del";
+    openApp.textContent = "↗";
+    openApp.title = "Open in YouTube app";
+    openApp.href = "https://www.youtube.com/playlist?list=" + encodeURIComponent(p.id);
+    openApp.target = "_blank";
+    openApp.rel = "noopener";
+    openApp.style.textDecoration = "none";
+    openApp.onclick = e=>e.stopPropagation();
+    row.appendChild(openApp);
     const edit = document.createElement("button");
     edit.className = "preset-del";
     edit.textContent = "✏️";
