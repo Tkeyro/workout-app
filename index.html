@@ -280,6 +280,7 @@
     cursor:pointer; user-select:none; -webkit-user-select:none;
   }
   .preset-del{background:none; border:none; color:var(--dim); font-size:15px; cursor:pointer; padding:2px 6px;}
+  .preset-row.playing{border-color:var(--accent); color:var(--accent);}
   .ex-option{
     display:flex; align-items:center; justify-content:space-between;
     padding:12px 10px; border-radius:10px; border:1px solid var(--line);
@@ -490,7 +491,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "1.9";
+const APP_VERSION = "2.0";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1385,6 +1386,7 @@ document.getElementById("importFile").onchange = async e=>{
 /* ================= accounts / music ================= */
 let ytPlayer = null;
 let ytShuffleOn = false;
+let currentYtId = null;
 
 /* run a player command safely — no-op if the player isn't ready or the browser blocks it */
 function ytCall(fn){
@@ -1504,7 +1506,8 @@ function buildMusicLists(){
 
   data.music.yt.forEach((p, i)=>{
     const row = document.createElement("div");
-    row.className = "preset-row";
+    row.className = "preset-row" + (p.id===currentYtId ? " playing" : "");
+    row.dataset.ytid = p.id;
     const label = document.createElement("span");
     label.textContent = "🎧 " + p.name;
     row.appendChild(label);
@@ -1560,17 +1563,29 @@ function buildMusicLists(){
   document.getElementById("spListCard").replaceChildren(sp);
 }
 
+function highlightYt(){
+  document.querySelectorAll("#ytListCard .preset-row").forEach(r=>{
+    r.classList.toggle("playing", r.dataset.ytid===currentYtId);
+  });
+}
+
 function playYtPlaylist(id){
+  currentYtId = id;
+  highlightYt();
   const start = ()=>{
     document.getElementById("ytPlayerCard").style.display = "";
-    if(ytPlayer && ytPlayer.loadPlaylist){
-      ytPlayer.loadPlaylist({listType:"playlist", list:id});
-      return;
-    }
-    ytPlayer = new YT.Player("ytPlayerBox", {
+    // tear the old player down and rebuild — loadPlaylist on a live player
+    // doesn't reliably switch, so tapping a second playlist did nothing
+    if(ytPlayer && ytPlayer.destroy){ try{ ytPlayer.destroy(); }catch(e){} }
+    ytPlayer = null;
+    const box = document.getElementById("ytPlayerBox");
+    box.innerHTML = "";
+    const mount = document.createElement("div");
+    box.appendChild(mount);
+    ytPlayer = new YT.Player(mount, {
       height:"200", width:"100%",
       playerVars:{listType:"playlist", list:id, playsinline:1},
-      events:{onReady:e=>e.target.playVideo()}
+      events:{onReady:e=>{ try{ e.target.setShuffle(ytShuffleOn); e.target.playVideo(); }catch(_){} }}
     });
   };
   if(window.YT && window.YT.Player){ start(); return; }
