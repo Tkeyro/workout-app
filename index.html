@@ -491,7 +491,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "2.4";
+const APP_VERSION = "2.5";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1394,6 +1394,21 @@ function ytCall(fn){
   try{ fn(ytPlayer); }catch(e){}
 }
 
+/* open a playlist in its native app; fall back to the web link if the app isn't installed */
+function openExternalApp(appUrl, webUrl){
+  let switched = false;
+  const mark = ()=>{ switched = true; };
+  document.addEventListener("visibilitychange", mark, {once:true});
+  window.addEventListener("pagehide", mark, {once:true});
+  // if the app didn't take over (still visible after a beat), open the web page instead
+  setTimeout(()=>{
+    document.removeEventListener("visibilitychange", mark);
+    window.removeEventListener("pagehide", mark);
+    if(!switched && !document.hidden) window.location.href = webUrl;
+  }, 1100);
+  window.location.href = appUrl;
+}
+
 function parseYtList(str){
   const m = str.match(/[?&]list=([\w-]+)/);
   if(m) return m[1];
@@ -1517,10 +1532,12 @@ function buildMusicLists(){
     openApp.textContent = "↗";
     openApp.title = "Open in YouTube app";
     openApp.href = "https://www.youtube.com/playlist?list=" + encodeURIComponent(p.id);
-    openApp.target = "_blank";
-    openApp.rel = "noopener";
     openApp.style.textDecoration = "none";
-    openApp.onclick = e=>e.stopPropagation();
+    openApp.onclick = e=>{
+      e.preventDefault(); e.stopPropagation();
+      // the youtube:// app scheme routes into the app more reliably than a blank-target web link
+      openExternalApp("youtube://www.youtube.com/playlist?list=" + p.id, openApp.href);
+    };
     row.appendChild(openApp);
     const edit = document.createElement("button");
     edit.className = "preset-del";
@@ -1572,10 +1589,12 @@ function buildMusicLists(){
     openApp.textContent = "↗";
     openApp.title = "Open in Spotify app";
     openApp.href = "https://open.spotify.com/playlist/" + encodeURIComponent(p.id);
-    openApp.target = "_blank";
-    openApp.rel = "noopener";
     openApp.style.textDecoration = "none";
-    openApp.onclick = e=>e.stopPropagation();
+    openApp.onclick = e=>{
+      e.preventDefault(); e.stopPropagation();
+      // spotify:playlist:ID opens straight to the playlist in the app
+      openExternalApp("spotify:playlist:" + p.id, openApp.href);
+    };
     row.appendChild(openApp);
     const edit = document.createElement("button");
     edit.className = "preset-del";
