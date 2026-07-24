@@ -497,7 +497,7 @@ const LIBRARY = {
   Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "2.8";
+const APP_VERSION = "2.9";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -1758,20 +1758,31 @@ function timerVolume(){ return data.timerVolume==null ? 0.6 : data.timerVolume; 
 function gentleBeep(){
   if(navigator.vibrate) navigator.vibrate([200,120,200,120,200]);
   const vol = timerVolume();
-  if(!audioCtx || data.soundOn===false || vol<=0) return;
+  if(data.soundOn===false || vol<=0) return;
+  // make sure we have an audio context and it's awake (iOS may have suspended it)
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+  }
   const peak = 0.3 * vol;
-  const now = audioCtx.currentTime;
-  for(let i=0;i<3;i++){
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = "sine";
-    o.frequency.value = 830;
-    const t = now + i*0.55;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(peak, t+0.06);
-    g.gain.exponentialRampToValueAtTime(0.001, t+0.45);
-    o.connect(g).connect(audioCtx.destination);
-    o.start(t); o.stop(t+0.5);
+  const playTones = ()=>{
+    const now = audioCtx.currentTime;
+    for(let i=0;i<3;i++){
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "sine";
+      o.frequency.value = 830;
+      const t = now + i*0.55;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(peak, t+0.06);
+      g.gain.exponentialRampToValueAtTime(0.001, t+0.45);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t); o.stop(t+0.5);
+    }
+  };
+  if(audioCtx.state==="suspended"){
+    audioCtx.resume().then(playTones).catch(()=>{});
+  }else{
+    playTones();
   }
 }
 
