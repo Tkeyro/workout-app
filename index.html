@@ -321,6 +321,12 @@
     border-radius:10px; padding:12px 0; font-size:16px; cursor:pointer;
   }
   .sets-count button.selected{background:var(--accent); border-color:var(--accent); color:#06240f; font-weight:700;}
+  .mode-toggle{display:flex; gap:8px; margin-top:8px;}
+  .mode-toggle button{
+    flex:1; background:var(--card2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:9px 0; font-size:14px; cursor:pointer;
+  }
+  .mode-toggle button.selected{background:var(--accent); border-color:var(--accent); color:#06240f; font-weight:700;}
   .goal-row{display:flex; align-items:center; gap:10px; margin-top:10px;}
   .goal-row label{font-size:13px; color:var(--dim);}
   .goal-input{
@@ -488,16 +494,17 @@
 "use strict";
 
 /* ================= data ================= */
-const CATEGORIES = ["Chest","Legs","Biceps","Triceps","Shoulders"];
+const CATEGORIES = ["Chest","Legs","Biceps","Triceps","Shoulders","Abs"];
 const LIBRARY = {
   Chest:["Bench Press","Incline Bench Press","Dips (Bodyweight)","Chest Fly","Push-Ups","Cable Crossover"],
   Legs:["Squat","Leg Press","Romanian Deadlift","Lunges","Leg Extension","Leg Curl","Calf Raise"],
   Biceps:["Barbell Curl","Dumbbell Curl","Hammer Curl","Preacher Curl","Cable Curl","Chin-Ups"],
   Triceps:["Tricep Pushdown","Skull Crushers","Overhead Extension","Close-Grip Bench","Dips (Bodyweight)"],
-  Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"]
+  Shoulders:["Overhead Press","Lateral Raise","Front Raise","Rear Delt Fly","Arnold Press","Shrugs"],
+  Abs:["Hanging Knee Raise","Ab Sledgehammer","Ab Rollup","Ab Knee to Elbow","Plank","Crunches","Leg Raises","Russian Twists"]
 };
 const STORE_KEY = "workoutTrackerData_v1";
-const APP_VERSION = "2.9";
+const APP_VERSION = "3.0";
 
 /* every exercise known to the app, for custom categories that mix muscle groups */
 function allLibraryExercises(){
@@ -849,11 +856,17 @@ function sessionCard(s, idx, prev){
     controls.appendChild(setsWrap);
     row.appendChild(controls);
 
-    // goal reps label
+    // goal / mode label — reps or time (seconds)
+    const setUnit = ex.mode==="time" ? "sec" : "reps";
     if(ex.goal){
       const g = document.createElement("div");
       g.className = "ex-goal";
-      g.textContent = "🎯 Goal: " + ex.goal + " reps/set";
+      g.textContent = "🎯 Goal: " + ex.goal + " " + setUnit + "/set";
+      row.appendChild(g);
+    }else if(ex.mode==="time"){
+      const g = document.createElement("div");
+      g.className = "ex-goal";
+      g.textContent = "⏱ seconds per set";
       row.appendChild(g);
     }
 
@@ -966,7 +979,7 @@ let pickerState = null;
 const DEFAULT_SETS = 4;
 
 function openPicker(opts){
-  pickerState = {mode:opts.mode, sessionIdx:opts.sessionIdx, selected:new Set(), custom:[], step:1, setsChoice:{}, goalChoice:{}, search:""};
+  pickerState = {mode:opts.mode, sessionIdx:opts.sessionIdx, selected:new Set(), custom:[], step:1, setsChoice:{}, goalChoice:{}, modeChoice:{}, search:""};
   const sessions = data.cats[activeCat].sessions;
   const last = sessions[sessions.length-1];
 
@@ -1032,7 +1045,7 @@ function renderPresetList(){
       const sessions = data.cats[activeCat].sessions;
       const exercises = p.exercises.map(pe=>{
         const lw = lastWeightFor(pe.name);
-        return {name:pe.name, weight:lw.weight, unit:lw.unit, goal:pe.goal||null, reps:Array(pe.sets).fill(null)};
+        return {name:pe.name, weight:lw.weight, unit:lw.unit, goal:pe.goal||null, mode:pe.mode||"reps", reps:Array(pe.sets).fill(null)};
       });
       sessions.push({date:new Date().toISOString(), exercises, diet:null, sleep:null, finished:false});
       save(); closePicker(); renderSessions();
@@ -1072,7 +1085,8 @@ function showSetsStep(){
       rowB.appendChild(b);
     }
     q.appendChild(rowB);
-    // goal reps (optional)
+
+    // goal reps / time (optional) — built first so the mode toggle can relabel it
     const goalRow = document.createElement("div");
     goalRow.className = "goal-row";
     const gl = document.createElement("label");
@@ -1088,6 +1102,23 @@ function showSetsStep(){
       pickerState.goalChoice[name] = gi.value ? parseInt(gi.value,10) : null;
     };
     goalRow.appendChild(gi);
+
+    // track this exercise by reps or by time (seconds)
+    pickerState.modeChoice[name] = "reps";
+    const modeRow = document.createElement("div");
+    modeRow.className = "mode-toggle";
+    [["Reps","reps"],["Time (sec)","time"]].forEach(([txt,m])=>{
+      const b = document.createElement("button");
+      b.textContent = txt;
+      if(m==="reps") b.classList.add("selected");
+      b.onclick = ()=>{
+        pickerState.modeChoice[name] = m;
+        [...modeRow.children].forEach((c,ci)=>c.classList.toggle("selected", (ci===0?"reps":"time")===m));
+        gl.textContent = m==="time" ? "🎯 Goal time (sec):" : "🎯 Goal reps:";
+      };
+      modeRow.appendChild(b);
+    });
+    q.appendChild(modeRow);
     q.appendChild(goalRow);
     box.appendChild(q);
   });
@@ -1193,7 +1224,7 @@ document.getElementById("pickerConfirm").onclick = ()=>{
   const pname = nameInp ? nameInp.value.trim() : "";
   if(pname){
     const presets = getPresets();
-    const exs = chosen.map(n=>({name:n, sets:pickerState.setsChoice[n]||DEFAULT_SETS, goal:pickerState.goalChoice[n]||null}));
+    const exs = chosen.map(n=>({name:n, sets:pickerState.setsChoice[n]||DEFAULT_SETS, goal:pickerState.goalChoice[n]||null, mode:pickerState.modeChoice[n]||"reps"}));
     const existing = presets.find(p=>p.name.toLowerCase()===pname.toLowerCase());
     if(existing) existing.exercises = exs;
     else presets.push({name:pname, exercises:exs});
@@ -1203,7 +1234,7 @@ document.getElementById("pickerConfirm").onclick = ()=>{
   // carry over last-used weight + unit for each exercise
   const mk = name=>{
     const lw = lastWeightFor(name);
-    return {name, weight:lw.weight, unit:lw.unit, goal:pickerState.goalChoice[name]||null,
+    return {name, weight:lw.weight, unit:lw.unit, goal:pickerState.goalChoice[name]||null, mode:pickerState.modeChoice[name]||"reps",
       reps:Array(pickerState.setsChoice[name]||DEFAULT_SETS).fill(null)};
   };
 
